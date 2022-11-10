@@ -69,8 +69,15 @@ def repair_chromossome(chromossome, instance, num_libraries):
 
 
 
-# def fitness(path, instance):
+def fitness(path, instance):
+    distances = instance.n_shortest_edges_of_instance(8)
+    print(distances)
+    print(distances[0])
+    temp = distances[0]
 
+    print(temp)
+    # for i in range(len(path)):
+    #     if(distances)
 
 
 def tsp_solver():
@@ -85,6 +92,8 @@ def tsp_solver():
     gene_libraries = gen_libraries(tsp, num_libraries, library_size)
     chromossome = gen_chromossome(gene_libraries, num_libraries)
     path = repair_chromossome(chromossome, tsp, num_libraries)
+
+    fitness(path, tsp)
 
     return(path)
 
