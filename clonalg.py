@@ -19,6 +19,13 @@ def clone(cell, clone_rate):
 
     return clones
 
+def hypermutate_variability(cell, mutation_rate, antigen):
+    genes = cell[0]
+    clone_cache = []
+    for gen in genes:
+        clone_cache.append(gen + (uniform(0, 1) * (mutation_rate * cell[1])))
+
+    return (np.array(clone_cache), abs(affinity(clone_cache, antigen)))
 
 def hypermutate(cell, mutation_rate, antigen, feature_min, feature_max):
     if uniform() <= abs(cell[1]) / (mutation_rate * 100):
