@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.random import uniform
 
+
 def affinity(cell, antigen):
     aff = 0
     for i in range(len(cell)):
@@ -19,13 +20,17 @@ def clone(cell, clone_rate):
 
     return clones
 
-def hypermutate_variability(cell, mutation_rate, antigen):
+
+def hypermutate_variability(cell, mutation_rate, antigen, best):
     genes = cell[0]
     clone_cache = []
     for gen in genes:
-        clone_cache.append(gen + (uniform(0, 1) * (mutation_rate * cell[1])))
+        ## ˜Sortear` individualmente por atributo baseado na mutation_rate
+        if uniform() <= mutation_rate:
+            clone_cache.append(gen + (uniform(0, 1) * (mutation_rate * cell[1])))
 
     return (np.array(clone_cache), abs(affinity(clone_cache, antigen)))
+
 
 def hypermutate(cell, mutation_rate, antigen, feature_min, feature_max):
     if uniform() <= abs(cell[1]) / (mutation_rate * 100):
@@ -54,3 +59,6 @@ def replace(population, population_rand, population_size):
 
     return population
 
+
+def float_into_distance(valor, best):
+    return valor * 10 ** (len(str(best).split('.')[1]))
