@@ -3,10 +3,7 @@ from numpy.random import uniform
 
 
 def affinity(cell, antigen):
-    aff = 0
-    for i in range(len(cell)):
-        aff += (cell[i] - antigen[i])
-    return aff
+    return np.linalg.norm(cell - antigen)
 
 
 def create_random_cells(population_size, feature_num, feature_min, feature_max):
@@ -21,29 +18,18 @@ def clone(cell, clone_rate):
     return clones
 
 
-def hypermutate_variability(cell, mutation_rate, antigen, best):
+def hypermutate_variability(cell, mutation_rate, antigen):
     genes = cell[0]
     clone_cache = []
     for gen in genes:
-        ## ˜Sortear` individualmente por atributo baseado na mutation_rate
-        if uniform() <= mutation_rate:
-            clone_cache.append(gen + (uniform(0, 1) * (mutation_rate * cell[1])))
+        if uniform(0, 1) < mutation_rate:
+            mutated_gen = gen + (uniform(0, 1) * (mutation_rate * cell[1]))
+            clone_cache.append(mutated_gen)
+        else:
+            clone_cache.append(gen)
 
-    return (np.array(clone_cache), abs(affinity(clone_cache, antigen)))
-
-
-def hypermutate(cell, mutation_rate, antigen, feature_min, feature_max):
-    if uniform() <= abs(cell[1]) / (mutation_rate * 100):
-        ind_tmp = []
-        for gen in cell[0]:
-            if uniform() <= abs(cell[1]) / (mutation_rate * 100):
-                ind_tmp.append(uniform(low=feature_min, high=feature_max))
-            else:
-                ind_tmp.append(gen)
-
-        return (np.array(ind_tmp), abs(affinity(cell, antigen)))
-    else:
-        return cell
+    mutated_cell = (np.array(clone_cache), abs(affinity(clone_cache, antigen)))
+    return mutated_cell
 
 
 def select(pop, pop_clones, pop_size):
@@ -59,6 +45,38 @@ def replace(population, population_rand, population_size):
 
     return population
 
+def remove_similar_clones(clone_population, sigma1):
+    remaining_clones = []
+    n_clones = len(clone_population)
+    
+    for i in range(n_clones):
+        is_similar = False
+        for j in range(i + 1, n_clones):
+            similarity = affinity(clone_population[i][0], clone_population[j][0])
+            if similarity < sigma1:
+                is_similar = True
+                break
+        if not is_similar:
+            remaining_clones.append(clone_population[i])
+    return remaining_clones
 
-def float_into_distance(valor, best):
-    return valor * 10 ** (len(str(best).split('.')[1]))
+def euclidean_distance(cell1, cell2):
+    return np.linalg.norm(cell1[0] - cell2[0])
+
+def suppress_similar_cells(population, similarity_threshold):
+    suppressed_population = []
+
+    for i, cell1 in enumerate(population):
+        is_similar = False
+
+        for j, cell2 in enumerate(population):
+            if i != j:
+                similarity = euclidean_distance(cell1, cell2)
+                if similarity < similarity_threshold:
+                    is_similar = True
+                    break
+
+        if not is_similar:
+            suppressed_population.append(cell1)
+
+    return suppressed_population
