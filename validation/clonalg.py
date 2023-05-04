@@ -1,14 +1,13 @@
 import numpy as np
 from numpy.random import uniform
 
-def affinity(cell, antigen):
-    return ((2-np.linalg.norm(cell - antigen))/2)
 
-def inverse_affinity(cell, antigen):
-    return (np.linalg.norm(cell - antigen)/2)
+def affinity(cell, antigen):
+    return np.linalg.norm(cell - antigen)
+
 
 def create_random_cells(population_size, feature_num, feature_min, feature_max):
-    population = [uniform(low=0, high=1, size=feature_num) for x in range(population_size)]
+    population = [uniform(low=feature_min, high=feature_max, size=feature_num) for x in range(population_size)]
     return population
 
 
@@ -18,20 +17,18 @@ def clone(cell, clone_rate):
 
     return clones
 
+
 def hypermutate_variability(cell, mutation_rate, antigen):
     genes = cell[0]
     clone_cache = []
     for gen in genes:
         if uniform(0, 1) < mutation_rate:
-            mutated_gen = gen + ((uniform(-1, 1) * (1 - cell[1])) * 0.1)
-            
-            if(mutated_gen < 0): mutated_gen = 0
-            if(mutated_gen > 1): mutated_gen = 1
+            mutated_gen = gen + (uniform(0, 1) * (mutation_rate * cell[1]))
             clone_cache.append(mutated_gen)
         else:
             clone_cache.append(gen)
 
-    mutated_cell = (np.array(clone_cache), affinity(clone_cache, antigen))
+    mutated_cell = (np.array(clone_cache), abs(affinity(clone_cache, antigen)))
     return mutated_cell
 
 
@@ -56,14 +53,17 @@ def remove_similar_clones(clone_population, sigma1):
         is_similar = False
         for j in range(i + 1, n_clones):
             similarity = affinity(clone_population[i][0], clone_population[j][0])
-            if similarity > sigma1:
+            if similarity < sigma1:
                 is_similar = True
                 break
         if not is_similar:
             remaining_clones.append(clone_population[i])
     return remaining_clones
 
-def suppress_similar_cells(population, sigma1):
+def euclidean_distance(cell1, cell2):
+    return np.linalg.norm(cell1[0] - cell2[0])
+
+def suppress_similar_cells(population, similarity_threshold):
     suppressed_population = []
 
     for i, cell1 in enumerate(population):
@@ -71,8 +71,8 @@ def suppress_similar_cells(population, sigma1):
 
         for j, cell2 in enumerate(population):
             if i != j:
-                similarity = affinity(cell1, cell2)
-                if similarity > sigma1:
+                similarity = euclidean_distance(cell1, cell2)
+                if similarity < similarity_threshold:
                     is_similar = True
                     break
 

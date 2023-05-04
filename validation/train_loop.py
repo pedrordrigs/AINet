@@ -8,15 +8,13 @@ def train_ais_classifier(train, feature_num, feature_min, feature_max, populatio
     while stop != stop_condition:
         for antigen in train:
             population_affinity = [(cell, clonalg.affinity(cell, antigen)) for cell in population]
-            ## cell[0] = gene   cell[1] = affinity/fitness
             population_affinity = sorted(population_affinity, key=lambda x: abs(x[1]))
-            best_affinity = population_affinity[selection_size:]
+            best_affinity = population_affinity[:selection_size]
 
             clone_population = []
             for cell in best_affinity:
                 cell_clones = clonalg.clone(cell, clone_rate)
                 clone_population += cell_clones
-
 
             mutated_clone_population = []
             for cell in clone_population:
@@ -27,9 +25,8 @@ def train_ais_classifier(train, feature_num, feature_min, feature_max, populatio
             pop_size = round(len(clone_population) / 100) * memory_set_percentage
             mutated_clone_population = mutated_clone_population[:pop_size]
 
-            filtered_clone_population = list(filter(lambda x: x[1] < sigma2, mutated_clone_population))
-            
-            remaining_clone_population = clonalg.remove_similar_clones(filtered_clone_population, sigma2)
+            filtered_clone_population = list(filter(lambda x: x[1] > sigma2, mutated_clone_population))
+            remaining_clone_population = clonalg.remove_similar_clones(filtered_clone_population, sigma1)
 
             remaining_clone_population_no_affinity = [(cell[0],) for cell in remaining_clone_population]
             population += remaining_clone_population_no_affinity
