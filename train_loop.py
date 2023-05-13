@@ -1,83 +1,70 @@
 import numpy as np
 import clonalg
 
-def train_ais_classifier(train, feature_num, feature_min, feature_max, population_size=500, selection_size=70, memory_set_percentage=20, clone_rate=30, mutation_rate=0.2, stop_condition=50, d=15, sigma1=0.4, sigma2=0.4):
+def train_ais_classifier(train, feature_num, feature_min, feature_max, population_size, selection_size, memory_set_percentage, clone_rate, mutation_rate, stop_condition, d, sigma1, sigma2):
     stop = 0
     population = clonalg.create_random_cells(population_size, feature_num, feature_min, feature_max)
 
     while stop != stop_condition:
+        # 1. For each antigen do
         for antigen in train:
+            # 1.1 Determine its affinity to network cells
             population_affinity = [(cell, clonalg.affinity(cell, antigen)) for cell in population]
-            ## cell[0] = gene   cell[1] = affinity/fitness
+            # 1.2 Select the n highest affinity network cells
             population_affinity = sorted(population_affinity, key=lambda x: abs(x[1]))
             best_affinity = population_affinity[selection_size:]
-
+            # 1.3 Generate Nc clones from these n cells. The higher the affinity, the larger Nc;
             clone_population = []
             for cell in best_affinity:
                 cell_clones = clonalg.clone(cell, clone_rate)
                 clone_population += cell_clones
-
-
-            mutated_clone_population = []
+            # 1.4 Apply hypermutation to the generated clones, with variability inversely proportional to the progenitor fitness 
+            # 1.5 Determine the affinity among the antigen and all clones
+            mutaded_clone_population = []
             for cell in clone_population:
                 mutated_clone = clonalg.hypermutate_variability(cell, mutation_rate, antigen)
-                mutated_clone_population.append(mutated_clone)
+                mutaded_clone_population.append(mutated_clone)
+            # 1.6 Keep only m% of the highest affinity mutated clones into the clone population
+            mutaded_clone_population.sort(key=lambda x: x[1])
+            pop_size = round(len(clone_population)/100)*memory_set_percentage
 
-            mutated_clone_population.sort(key=lambda x: x[1])
-            pop_size = round(len(clone_population) / 100) * memory_set_percentage
-            mutated_clone_population = mutated_clone_population[:pop_size]
+            mutaded_clone_population = mutaded_clone_population[pop_size:]
+            # 1.7 Eliminate all clones but one whose affinity with the antigen is inferior to a predefined threshold sigma2 (apoptosis)
+            filtered_clone_population = list(filter(lambda x: x[1] > sigma2, mutaded_clone_population))
+            # 1.8 Determine the affinity among all the mutated clonesand eliminate those whose affinity with each other is above a pre-defined threshold sigma1 (supression)
+            remaining_clone_population = clonalg.remove_similar_clones(filtered_clone_population, sigma1)
 
-            filtered_clone_population = list(filter(lambda x: x[1] < sigma2, mutated_clone_population))
-            
-            remaining_clone_population = clonalg.remove_similar_clones(filtered_clone_population, sigma2)
-
+            # 1.9 Insert the remaining clones into the populatuon
+            # Remova o atributo de afinidade das células em remaining_clone_population
             remaining_clone_population_no_affinity = [(cell[0],) for cell in remaining_clone_population]
-            population += remaining_clone_population_no_affinity
+            # Adicione remaining_clone_population_no_affinity à população
+            population = population + remaining_clone_population_no_affinity
 
-        population = clonalg.suppress_similar_cells(population, sigma1)
+        # 2.0 Determine the simillarity among all the antibodies and eliminate those with similarity above a threshold sigma1 (supression)
+        population = clonalg.remove_similar_clones(population, sigma1)
 
-        new_cells = clonalg.create_random_cells(int(population_size * (d / 100)), feature_num, feature_min, feature_max)
-        population += new_cells
+    # 3 Introduce a d% of new randomly generated cells (random insertion)
+        if(stop != stop_condition-1):
+            new_cells = clonalg.create_random_cells(int(population_size * (d / 100)), feature_num, feature_min, feature_max)
+            population += new_cells
+
+        for i, cell in enumerate(population):
+            # Verifica se a célula tem mais de uma dimensão
+            if len(cell[0].shape) > 1:
+                # Aplica numpy.ravel() para simplificar as dimensões
+                flattened_cell = np.ravel(cell[0])
+                population[i] = (flattened_cell,)
+            else:
+                population[i] = cell
+
+            if isinstance(cell, tuple):
+                array_cell = np.array(cell)
+                flattened_cell = np.ravel(array_cell)
+                population[i] = (flattened_cell)
+
         print("População: ", len(population), "     Iteração: ", stop)
         stop += 1
-
-    for i, cell in enumerate(population):
-        if len(cell[0].shape) > 1:
-            flattened_cell = np.ravel(cell[0])
-            population[i] = (flattened_cell,)
-        else:
-            population[i] = cell
-
-        if isinstance(cell, tuple):
-            array_cell = np.array(cell)
-            flattened_cell = np.ravel(array_cell)
-            population[i] = (flattened_cell)
-
     return population
-
-
-def multiclass_performance_measure(populations, test_data):
-    correct_classifications = 0
-    total_samples = test_data.shape[0]
-
-    for row in test_data:
-        sample_features = row[:-1]
-        true_label = int(row[-1])
-
-        class_scores = []
-        for population in populations:
-            if population:
-                class_score = sum(clonalg.affinity(cell, sample_features) for cell in population)
-                class_scores.append(class_score)
-            else:
-                class_scores.append(0)
-
-        predicted_label = class_scores.index(max(class_scores))
-
-        if predicted_label == true_label:
-            correct_classifications += 1
-
-    return correct_classifications / total_samples
 
 
 #////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,7 +94,36 @@ def train_clonalg_parallel(train_data, params, classes):
 
     return trained_populations
 
+# def multiclass_performance_measure_v2(populations, test_data):
+#     correct_classifications = 0
+#     total_samples = test_data.shape[0]
+#     true_labels = []
+#     predicted_labels = []
+
+#     for row in test_data:
+#         sample_features = row[:-1]
+#         true_label = int(row[-1])
+#         true_labels.append(true_label)
+
+#         class_scores = []
+#         for population in populations:
+#             if len(population) > 0:
+#                 max_affinity = max(clonalg.affinity(cell, sample_features) for cell in population)
+#                 class_scores.append(max_affinity)
+#             else:
+#                 class_scores.append(0)
+
+#         predicted_label = class_scores.index(max(class_scores))
+#         predicted_labels.append(predicted_label)
+
+#         if predicted_label == true_label:
+#             correct_classifications += 1
+
+#     accuracy = correct_classifications / total_samples
+#     return accuracy, true_labels, predicted_labels
+
 def multiclass_performance_measure_v2(populations, test_data):
+    k = 3
     correct_classifications = 0
     total_samples = test_data.shape[0]
     true_labels = []
@@ -120,8 +136,11 @@ def multiclass_performance_measure_v2(populations, test_data):
 
         class_scores = []
         for population in populations:
-            if population:
-                class_score = sum(clonalg.affinity(cell, sample_features) for cell in population)
+            if len(population) > 0:
+                # Calcule as k maiores afinidades para cada população
+                k_largest_affinities = sorted([clonalg.affinity(cell, sample_features) for cell in population], reverse=True)[:k]
+                # Some as k maiores afinidades para obter o escore da classe
+                class_score = sum(k_largest_affinities)
                 class_scores.append(class_score)
             else:
                 class_scores.append(0)
