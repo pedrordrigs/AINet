@@ -44,7 +44,7 @@ def train_ais_classifier(train, feature_num, feature_min, feature_max, populatio
         population = clonalg.remove_similar_clones(population, sigma1)
 
     # 3 Introduce a d% of new randomly generated cells (random insertion)
-        if(stop != stop_condition-1):
+        if(stop != stop_condition):
             new_cells = clonalg.create_random_cells(int(population_size * (d / 100)), feature_num, feature_min, feature_max)
             population += new_cells
 
@@ -77,22 +77,22 @@ def train_ais_classifier(train, feature_num, feature_min, feature_max, populatio
 
 import concurrent.futures
 
+def train_clonalg_single_class(train_data, params, target_class):
+    # Filtrar dados de treino para a classe alvo
+    train_subset = train_data.loc[train_data[train_data.columns[-1]] == target_class].drop(columns=[train_data.columns[-1]])
+    # Treinar a população usando os dados filtrados
+    train_subset_array = train_subset.values
+    population = train_ais_classifier(train_subset_array, **params)
+    return population
+
 def train_clonalg_parallel(train_data, params, classes):
-    def train_clonalg_single_class(train_data, params, target_class):
-        # Filtrar dados de treino para a classe alvo
-        train_subset = train_data.loc[train_data[train_data.columns[-1]] == target_class].drop(columns=[train_data.columns[-1]])
-        # Treinar a população usando os dados filtrados
-        train_subset_array = train_subset.values
-        population = train_ais_classifier(train_subset_array, **params)
-        return population
-    
     trained_populations = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = [executor.submit(train_clonalg_single_class, train_data, params, class_label) for class_label in classes]
         for future in concurrent.futures.as_completed(futures):
             trained_populations.append(future.result())
-
     return trained_populations
+
 
 # def multiclass_performance_measure_v2(populations, test_data):
 #     correct_classifications = 0
