@@ -77,7 +77,8 @@ def train_ais_classifier(train, feature_num, feature_min, feature_max, populatio
 
 import concurrent.futures
 
-def train_clonalg_single_class(train_data, params, target_class):
+def train_clonalg_single_class(args):
+    train_data, params, target_class = args
     # Filtrar dados de treino para a classe alvo
     train_subset = train_data.loc[train_data[train_data.columns[-1]] == target_class].drop(columns=[train_data.columns[-1]])
     # Treinar a população usando os dados filtrados
@@ -85,57 +86,37 @@ def train_clonalg_single_class(train_data, params, target_class):
     population = train_ais_classifier(train_subset_array, **params)
     return population
 
+# def train_clonalg_parallel(train_data, params, classes):
+#     trained_populations = []
+#     with concurrent.futures.ProcessPoolExecutor() as executor:
+#         futures = [executor.submit(train_clonalg_single_class, train_data, params, class_label) for class_label in classes]
+#         for future in concurrent.futures.as_completed(futures):
+#             trained_populations.append(future.result())
+#     return trained_populations
+
 def train_clonalg_parallel(train_data, params, classes):
     trained_populations = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [executor.submit(train_clonalg_single_class, train_data, params, class_label) for class_label in classes]
-        for future in concurrent.futures.as_completed(futures):
-            trained_populations.append(future.result())
+        results = executor.map(train_clonalg_single_class, [(train_data, params, class_label) for class_label in classes])
+        for result in results:
+            trained_populations.append(result)
     return trained_populations
 
 
-# def multiclass_performance_measure_v2(populations, test_data):
-#     correct_classifications = 0
-#     total_samples = test_data.shape[0]
-#     true_labels = []
-#     predicted_labels = []
-
-#     for row in test_data:
-#         sample_features = row[:-1]
-#         true_label = int(row[-1])
-#         true_labels.append(true_label)
-
-#         class_scores = []
-#         for population in populations:
-#             if len(population) > 0:
-#                 max_affinity = max(clonalg.affinity(cell, sample_features) for cell in population)
-#                 class_scores.append(max_affinity)
-#             else:
-#                 class_scores.append(0)
-
-#         predicted_label = class_scores.index(max(class_scores))
-#         predicted_labels.append(predicted_label)
-
-#         if predicted_label == true_label:
-#             correct_classifications += 1
-
-#     accuracy = correct_classifications / total_samples
-#     return accuracy, true_labels, predicted_labels
-
-def multiclass_performance_measure_v2(populations, test_data):
+def multiclass_performance_measure_v2(trained_populations, test_data_array):
     k = 3
     correct_classifications = 0
-    total_samples = test_data.shape[0]
+    total_samples = test_data_array.shape[0]
     true_labels = []
     predicted_labels = []
 
-    for row in test_data:
+    for row in test_data_array:
         sample_features = row[:-1]
         true_label = int(row[-1])
         true_labels.append(true_label)
 
         class_scores = []
-        for population in populations:
+        for population in trained_populations:
             if len(population) > 0:
                 # Calcule as k maiores afinidades para cada população
                 k_largest_affinities = sorted([clonalg.affinity(cell, sample_features) for cell in population], reverse=True)[:k]
@@ -151,5 +132,17 @@ def multiclass_performance_measure_v2(populations, test_data):
         if predicted_label == true_label:
             correct_classifications += 1
 
+    # Mapeamento de classes
+    class_mapping = {0: 0, 1: 1, 2: 2}
+
+    # Aplicar o mapeamento de classes aos rótulos previstos
+    predicted_labels = [class_mapping[label] for label in predicted_labels]
+
+    # Recalcular a acurácia
+    correct_classifications = sum([predicted == true for predicted, true in zip(predicted_labels, true_labels)])
     accuracy = correct_classifications / total_samples
+
+    # Recalcular os rótulos verdadeiros usando o mapeamento de classes
+    true_labels = [class_mapping[label] for label in true_labels]
+
     return accuracy, true_labels, predicted_labels
